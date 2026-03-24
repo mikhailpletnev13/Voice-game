@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Voice Game</title>
+
+<style>
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #1e1e2f, #2c2c54);
+  font-family: 'Segoe UI', sans-serif;
+  color: white;
+}
+
+.container {
+  backdrop-filter: blur(15px);
+  background: rgba(255,255,255,0.05);
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 0 40px rgba(0,0,0,0.3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px; /* ← главный отступ */
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+button {
+  width: 260px;
+  padding: 15px;
+  font-size: 18px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: white;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.record {
+  background: linear-gradient(45deg, #ff416c, #ff4b2b);
+}
+
+.play {
+  background: linear-gradient(45deg, #00c6ff, #0072ff);
+}
+
+.reverse {
+  background: linear-gradient(45deg, #8e2de2, #4a00e0);
+}
+
+button:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+button::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: -100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+  transition: 0.5s;
+}
+
+button:hover::after {
+  left: 100%;
+}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+  <h1>🎤 Voice Game</h1>
+
+  <button id="recordBtn" class="record">🔴 Record Voice</button>
+  <button id="playBtn" class="play">▶️ Play Voice</button>
+  <button id="reverseBtn" class="reverse">🔁 Play Reverse</button>
+</div>
+
+<script>
+let mediaRecorder;
+let audioChunks = [];
+let audioBuffer = null;
+let isRecording = false;
+let stream = null;
+
+const recordBtn = document.getElementById('recordBtn');
+const playBtn = document.getElementById('playBtn');
+const reverseBtn = document.getElementById('reverseBtn');
+
+recordBtn.onclick = async () => {
+  if (!isRecording) {
+    // НАЧАТЬ НОВУЮ ЗАПИСЬ
+    audioChunks = [];
+    audioBuffer = null;
+
+    if (!stream) {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = e => {
+      audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(audioChunks);
+      const arrayBuffer = await blob.arrayBuffer();
+
+      const audioContext = new AudioContext();
+      audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    };
+
+    mediaRecorder.start();
+    isRecording = true;
+    recordBtn.textContent = "⏹ Stop Recording";
+
+  } else {
+    // ОСТАНОВИТЬ ЗАПИСЬ
+    mediaRecorder.stop();
+    isRecording = false;
+    recordBtn.textContent = "🔴 Record Voice";
+  }
+};
+
+playBtn.onclick = () => {
+  if (!audioBuffer) return alert("Сначала запиши звук");
+
+  const audioContext = new AudioContext();
+  const source = audioContext.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(audioContext.destination);
+  source.start();
+};
+
+reverseBtn.onclick = () => {
+  if (!audioBuffer) return alert("Сначала запиши звук");
+
+  const audioContext = new AudioContext();
+
+  const reversedBuffer = audioContext.createBuffer(
+    audioBuffer.numberOfChannels,
+    audioBuffer.length,
+    audioBuffer.sampleRate
+  );
+
+  for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+    const inputData = audioBuffer.getChannelData(channel);
+    const outputData = reversedBuffer.getChannelData(channel);
+
+    for (let i = 0; i < inputData.length; i++) {
+      outputData[i] = inputData[inputData.length - i - 1];
+    }
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = reversedBuffer;
+  source.connect(audioContext.destination);
+  source.start();
+};
+</script>
+
+</body>
+</html>
